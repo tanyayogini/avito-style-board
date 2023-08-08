@@ -9,7 +9,11 @@ services:
       POSTGRES_USER: skymarket
       POSTGRES_PASSWORD: skymarket
       POSTGRES_DB: skymarket
-    restart: always
+    healthcheck:
+      test: pg_isready -U skymarket -d skymarket
+      interval: 5s
+      timeout: 2s
+      retries: 10
     ports:
     - "5432:5432"
 
@@ -23,7 +27,6 @@ services:
   nginx:
     image: nginx:1.19.3
     ports:
-      - "8000:8000"
       - "3000:3000"
     volumes:
       - ../skymarket/django_static/:/usr/share/nginx/html/django_static/
@@ -34,6 +37,33 @@ services:
     depends_on:
       - db
       - frontend
+
+  migrations:
+    build: ../skymarket/.
+    env_file: ../skymarket/.env
+    environment:
+      DB_HOST: db
+      POSTGRES_USER: skymarket
+      POSTGRES_PASSWORD: skymarket
+      POSTGRES_DB: skymarket
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python manage.py migrate
+
+  api:
+    build: ../skymarket/.
+    env_file: ../skymarket/.env
+    environment:
+      DB_HOST: db
+      POSTGRES_USER: skymarket
+      POSTGRES_PASSWORD: skymarket
+      POSTGRES_DB: skymarket
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:  
